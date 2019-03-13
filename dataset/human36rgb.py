@@ -119,8 +119,8 @@ class Human36RGB(Dataset):
         self.current_video = ""
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
-        # self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-        self.subjects = ['S1']
+        self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
+        # self.subjects = ['S1']
         self.subjects = [Subject(i) for i in self.subjects]
 
         self.data_dict = {}
@@ -227,7 +227,7 @@ class Human36RGB(Dataset):
                    index < self.matte_video_readers[i].current_frame or \
                    index >= self.matte_video_readers[i].readers.inputframenum or \
                    index >= self.rgb_video_readers[i].readers.inputframenum:
-                    print matte_videos[0],index,self.matte_video_readers[i].current_frame
+                    # print matte_videos[0],index,self.matte_video_readers[i].current_frame
                     return None
                     # raise ValueError("index not valid")
                 for frame in self.matte_video_readers[i].readers.nextFrame():
