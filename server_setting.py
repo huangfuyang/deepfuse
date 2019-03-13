@@ -1,5 +1,5 @@
 HM_PATH = '/home/hfy/data/human36'
-
+HM_RGB_PATH = 'home/hfy/data/human'
 LEARNING_RATE = 1e-5
 MOMENTUM = 0.9
 EPOCH_COUNT = 20

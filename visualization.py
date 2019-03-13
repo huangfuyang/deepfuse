@@ -23,9 +23,13 @@ def drawcirclecv(img, p,r=3):
 
 
 def plot_voxel(data):
-    x,y,z = np.where(data==1)
+    # print data
+    x,y,z = np.where(data>=1)
+    v = data[data>=1]
+    # print v
     scale = np.ones(x.shape[0])
-    graph = points3d(x,y,z)
+    graph = points3d(x,y,z,v)
+    graph.glyph.scale_mode='scale_by_vector'
     show()
 
 
