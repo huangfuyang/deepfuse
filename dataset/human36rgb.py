@@ -132,7 +132,7 @@ class Human36RGB(Dataset):
         self.save = False
         self.raw = False
         # self.subjects[0].actionName = ['Directions']
-        self.cams = load_cameras(os.path.join(HM_PATH,'h36m','cameras.h5'))
+        self.cams = load_cameras(os.path.join(HM_PATH,'cameras.h5'))
         for sub in self.subjects:
             self.data_dict[sub.name] = {}
             # self.data_dict[sub]['camera'] = self.cams[sub]
@@ -260,6 +260,7 @@ class Human36RGB(Dataset):
             np.savez_compressed(d_path,mcv=mcv,label=label,mid = mid,len=leng)
             if index % 100 == 0:
                 print '{0} {1} {2}/{3}  {4}/{5} saved'.format(info[0], info[1], index, data['label'].shape[0],item,self.length)
+            return 0
         # print time()-t
         # return {'data':self.frame_data,'label':label}
         return mcv,mid,leng
@@ -275,6 +276,10 @@ def preprocess():
     h.save = True
     for i in range(len(h)):
         r = h[i]
+        if r == 0:
+            continue
+        if i % 100 == 0:
+            print '{0}/{1} processed'.format(i,len(h))
 
 
 def show_raw():
