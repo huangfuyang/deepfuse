@@ -7,8 +7,9 @@ from server_setting import *
 from mcv import make_rgb_mcv
 from camera_hm import *
 import glob
+from time import time
 
-
+t = 0
 class MyReader():
     """
     video reader struct
@@ -119,8 +120,8 @@ class Human36RGB(Dataset):
         self.current_video = ""
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
-        self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-        # self.subjects = ['S1']
+        # self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
+        self.subjects = ['S1']
         self.subjects = [Subject(i) for i in self.subjects]
 
         self.data_dict = {}
@@ -157,6 +158,7 @@ class Human36RGB(Dataset):
         :param item: index of frame
         :return:
         """
+        global t
         info = self.data[item]
         # info = [sub.name, act, i]
         data = self.data_dict[info[0]][info[1]]
@@ -259,7 +261,9 @@ class Human36RGB(Dataset):
             d_path = os.path.join(d_path,str(index).zfill(5))
             np.savez_compressed(d_path,mcv=mcv,label=label,mid = mid,len=leng)
             if index % 100 == 0:
-                print '{0} {1} {2}/{3}  {4}/{5} saved'.format(info[0], info[1], index, data['label'].shape[0],item,self.length)
+                print '{0} {1} {2}/{3}  {4}/{5} saved in {6}s'.format(info[0], info[1], index, data['label'].shape[0],item,self.length,(time()-t))
+                t = time()
+
             return 0
         # print time()-t
         # return {'data':self.frame_data,'label':label}
@@ -271,6 +275,7 @@ class Human36RGB(Dataset):
 
 
 def preprocess():
+    t = time()
     h = Human36RGB(HM_PATH)
     # h.raw = True
     h.save = True
