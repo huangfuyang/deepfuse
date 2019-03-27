@@ -6,7 +6,7 @@ import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dataset.human36 import *
+from dataset.human36rgb import *
 from params import *
 from server_setting import *
 from time import time
@@ -93,7 +93,8 @@ def train_human(full = False):
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
-    dataset = Human36V(HM_PATH)
+    #dataset = Human36V(HM_PATH)
+    dataset = Human36RGB(HM_PATH)
     dataset.data_augmentation = True
 
     train_idx, valid_idx = dataset.get_train_test()
@@ -154,15 +155,16 @@ def train_human(full = False):
             'state_dict': net.state_dict(),
             'best_acc': best_err,
             'optimizer': optimizer.state_dict(),
-        }, is_best, 'checkpoint.{}.tar'.format(args.name))
-        if epoch % DECAY_EPOCH == 0:
+        }, is_best, 'checkpoint1.{}.tar'.format(args.name))
+
+    '''    if epoch % DECAY_EPOCH == 0:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': '3dHMP',
                 'state_dict': net.state_dict(),
                 'best_acc': best_err,
                 'optimizer': optimizer.state_dict(),
-            }, False, path)
+            }, False, path)  '''
             # if not is_best:
             #     lower_learning_rate(optimizer,DECAY_RATIO)
 
@@ -179,7 +181,7 @@ def test_human(path):
     fusenet.load_state_dict(checkpoint['state_dict'])
     fusenet.eval()
 
-    dataset = Human36V(HM_PATH)
+    dataset = Human36RGB(HM_PATH)
     dataset.data_augmentation = False
     criterion = nn.MSELoss().cuda()
     best_acc = checkpoint['best_acc']
@@ -356,7 +358,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
 
 # pre process multi-channel volume data from video
 def preprocess():
-    data = Human36(HM_PATH)
+    data = Human36RGB(HM_PATH)
     data.save = True
     for i in range(len(data)):
         d = data[i]
@@ -365,7 +367,7 @@ def preprocess():
 # visualization data
 def check_raw(index):
     from visualization import drawcirclecv
-    ds = Human36(HM_PATH)
+    ds = Human36RGB(HM_PATH)
     ds.save = False
     ds.raw = True
 
@@ -377,7 +379,6 @@ def check_raw(index):
         # print frames[0].shape
         # print label
         for j in range(len(frames)):
-
             gt = ds.cams['S1'][j].world2pix(torch.from_numpy(label).float().cuda())
             # print gt
             fc = frames[j].copy()
@@ -390,7 +391,7 @@ def check_raw(index):
 
 def check_volume():
     from visualization import plot_voxel_label,plot_voxel
-    ds = Human36V(HM_PATH)
+    ds = Human36RGB(HM_PATH)
     ds.data_augmentation = False
     for i in range(0,1):
         data, label, mid, leng= ds[i]
@@ -422,7 +423,7 @@ if __name__ == "__main__":
     train_human()
 
     # test only and save result
-    # test_human('checkpoint/human36_51.tar')
+    #test_human('/home/alzeng/remote/fyhuang/alzeng/deepfuse/test_model/checkpoint.5e-5.21_p2.tar')
 
     # check volume in 3D
     # check_volume()

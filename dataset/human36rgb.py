@@ -67,8 +67,8 @@ class Subject(object):
         self.videoName.sort()
         self.gtName.sort()
         self.pvhName.sort()
-        # print self.videoName
-        # print self.gtName
+       # print self.videoName
+       # print self.pvhName
         for f in self.videoName:
             aname = f.split('.')[0]
             if aname not in self.actionDict:
@@ -79,8 +79,8 @@ class Subject(object):
         else:
             self.actionName = self.actionDict.keys()
             self.actionName.sort()
-        # print self.actionName
-        # print self.actionDict[self.actionName[0]]
+        #print self.actionName
+        #print self.actionDict[self.actionName[0]] # ['Directions.csv', 'Directions.54138969.mp4', 'Directions.55011271.mp4', 'Directions.58860488.mp4', 'Directions.60457274.mp4']
 
     def select_action(self, num):
         """
@@ -96,6 +96,7 @@ class Subject(object):
         gtfile = self.actionDict[actionName][0]
         gtfile = os.path.join(self._gtpath,gtfile)
         gt = np.loadtxt(gtfile,dtype=np.str, delimiter=',')[:,:-1].astype(np.float32)
+        #print gt
         # with h5py.File(gtfile, 'r') as hf:
         #     points = hf[hf.keys()[0]][()]
         # return [os.path.join(self._bspath,x) for x in self.actionDict[actionName][1:]], points.T
@@ -120,9 +121,15 @@ class Human36RGB(Dataset):
         self.current_video = ""
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
-        # self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-        self.subjects = ['S1']
+        self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
+      #  self.training_subjects = ['S1','S5','S6','S7','S8']
+      #  self.test_subjects = ['S9','S11']
+        self.training_subjects = ['S1']
+        self.test_subjects = ['S9']
+        #self.subjects = ['S1']
         self.subjects = [Subject(i) for i in self.subjects]
+        self.training_subjects = [Subject(i) for i in self.training_subjects]
+        self.test_subjects = [Subject(i) for i in self.test_subjects]
 
         self.data_dict = {}
         self.data = []
@@ -132,45 +139,72 @@ class Human36RGB(Dataset):
         self.frame_data = [None]*NUM_CAM_HM*2
         self.save = False
         self.raw = False
+ #       self.test_lengths = [] #list for each subject and action in testset
         # self.subjects[0].actionName = ['Directions']
         self.cams = load_cameras(os.path.join(HM_PATH,'cameras.h5'))
-        for sub in self.subjects:
+        print 'load training set :'
+        for sub in self.training_subjects:
             self.data_dict[sub.name] = {}
             # self.data_dict[sub]['camera'] = self.cams[sub]
             for act in sub.actionName:
                 self.data_dict[sub.name][act] = {}
-                print 'load',sub,act
-                matte_videos,rgb_videos, label = sub.select_action(act)
-                lines = label.shape[0]
+                print 'load',sub,act  # load S1 Directions + kpts location
+                matte_videos,rgb_videos, label = sub.select_action(act) # four matte & rgb videos once ,__len__ = 4;;label shape= <type'tuple'>:(1612,96)
+                lines = label.shape[0] # eg.1612
                 self.data_dict[sub.name][act]['label'] = label
                 self.data_dict[sub.name][act]['matte_video'] = matte_videos
                 self.data_dict[sub.name][act]['rgb_video'] = rgb_videos
                 for i in range(lines):
                     self.data.append([sub.name, act, i])
+                #print lines, 'loaded'
                 self.length += lines
-        print self.length,'data loaded'
+        self.training_length = self.length
+        print 'training length is :', self.training_length
+        # load test set
+        print 'load test set :'
+        for sub in self.test_subjects:
+            self.data_dict[sub.name] = {}
+            # self.data_dict[sub]['camera'] = self.cams[sub]
+            for act in sub.actionName:
+                self.data_dict[sub.name][act] = {}
+                print 'load',sub,act  # load S1 Directions + kpts location
+                matte_videos,rgb_videos, label = sub.select_action(act) # four matte & rgb videos once ,__len__ = 4;;label shape= <type'tuple'>:(1612,96)
+                lines = label.shape[0] # eg.1612
+                self.data_dict[sub.name][act]['label'] = label
+                self.data_dict[sub.name][act]['matte_video'] = matte_videos
+                self.data_dict[sub.name][act]['rgb_video'] = rgb_videos
+                for i in range(lines):
+                    self.data.append([sub.name, act, i])
+               # print lines, 'loaded'
+
+                self.test_lengths.append(lines)
+                self.length += lines
+        self.test_length = self.length-self.training_length
+        print 'test length is :',self.test_length
+        print 'total length is: ',self.length
+
         # load camera params
         # self.subjects_length.append(sub_len)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item): #eg. in S1,item is from 0 to 62094 frames
         """
         get specific frame
         :param item: index of frame
         :return:
         """
         global t
-        info = self.data[item]
+        info = self.data[item] #type(info)=list:['S1','Directions',item]
         # info = [sub.name, act, i]
         data = self.data_dict[info[0]][info[1]]
         index = info[2]
         matte_videos = data['matte_video']
         rgb_videos = data['rgb_video']
-        label = data['label'][index]
+        label = data['label'][index] # [index,96] the index/th row info,(96,)
         d_path = os.path.join(os.sep, os.path.join(*rgb_videos[0].split(os.sep)[1:-1]),info[1])
         np_path = os.path.join(d_path, str(index).zfill(5)+'.npz')
         if not self.raw and os.path.isfile(np_path):
             npz = np.load(np_path)
-            mcv, label, mid, leng = npz['mcv'], npz['label'], npz['mid'], npz['len']
+            mcv, label, mid, leng = npz['mcv'], npz['label'], npz['mid'], npz['len'] #mcv:[60,60] ,label:(96,),mid:(3,),len:(1,)
             return mcv, label, mid, leng.reshape((1))
         for i in range(NUM_CAM_HM):
             # current video reader not matched
@@ -178,6 +212,7 @@ class Human36RGB(Dataset):
                 self.matte_video_readers[i].current_video = matte_videos[i]
                 self.rgb_video_readers[i].current_video = rgb_videos[i]
 
+                # set keys and values for parameters in ffmpeg
                 inputparameters = {}
                 outputparameters = {}
                 outputparameters['-pix_fmt'] = 'gray'
@@ -272,6 +307,15 @@ class Human36RGB(Dataset):
     def __len__(self):
         return len(self.data)
 
+    def get_train_test(self):
+        """
+        get train test dataset
+        :return: train indices, test indices
+        """
+        train = range(self.training_length)
+        test = range(self.training_length, self.length)
+        return train, test
+
 
 
 def preprocess():
@@ -310,10 +354,10 @@ def check_volume():
         label = torch.from_numpy(label)
         mid = torch.from_numpy(mid)
         leng = torch.from_numpy(leng)
-        print data.shape, label.shape, mid.shape, leng.shape
+        print data.shape, label.shape, mid.shape, leng.shape #(16,64,64,64)(96,) (3,)(1,)
         # s = data.sum(dim=0)
         # s[s < 4] = 0
-        for j in data:
+        for j in data: # j.shape :(64,64,64)
             plot_voxel(j)
         # leng = leng * (NUM_VOXEL / NUM_GT_SIZE)
         # base = mid - leng.repeat(1, 3) * (NUM_GT_SIZE / 2 - 0.5)
@@ -322,7 +366,11 @@ def check_volume():
         # plot_voxel_label(s, (label - base) / (leng / (NUM_VOXEL / NUM_GT_SIZE)))
 
 
+
 if __name__ == '__main__':
-    preprocess()
-    # show_raw()
-    # check_volume()
+    ds = Human36RGB(HM_PATH)
+    print len(ds)
+    ds[0]
+# preprocess()
+# show_raw()
+#check_volume()
