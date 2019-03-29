@@ -100,7 +100,7 @@ def make_rgb_mcv(data, label, camera, size = NUM_VOXEL):
     # v = torch.cuda.ByteTensor(size**3)
 
     # calculate voxel center
-    v = np.zeros((camera_l*4,size**3),dtype=np.byte)
+    v = np.zeros((camera_l*4,size**3),dtype=np.float32)
     start_p = (mi+seg_length/2)
     n_coords = np.ones(coords.shape,dtype=np.float32)
     n_coords[:,0] = coords[:,0]*seg_length + start_p[0]

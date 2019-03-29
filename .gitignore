@@ -50,6 +50,8 @@ coverage.xml
 # Translations
 *.mo
 *.pot
+*.npz
+*.tar
 
 # Django stuff:
 *.log
@@ -89,7 +91,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+checkpoint/
+result/
 # Spyder project settings
 .spyderproject
 .spyproject

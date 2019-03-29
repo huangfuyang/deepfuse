@@ -177,7 +177,7 @@ class Human36RGB(Dataset):
                     self.data.append([sub.name, act, i])
                # print lines, 'loaded'
 
-                self.test_lengths.append(lines)
+               # self.test_lengths.append(lines)
                 self.length += lines
         self.test_length = self.length-self.training_length
         print 'test length is :',self.test_length
@@ -204,8 +204,10 @@ class Human36RGB(Dataset):
         np_path = os.path.join(d_path, str(index).zfill(5)+'.npz')
         if not self.raw and os.path.isfile(np_path):
             npz = np.load(np_path)
-            mcv, label, mid, leng = npz['mcv'], npz['label'], npz['mid'], npz['len'] #mcv:[60,60] ,label:(96,),mid:(3,),len:(1,)
-            return mcv, label, mid, leng.reshape((1))
+            mcv, label, mid, leng = npz['mcv'], npz['label'], npz['mid'], npz['len'] #mcv:,label:(96,),mid:(3,),len:(1,)
+            mcv = mcv.astype(np.uint8)
+            mcv = torch.from_numpy(mcv).cuda().float()
+            return mcv, label.astype(np.float32), mid.astype(np.float32), leng.reshape((1)).astype(np.float32)
         for i in range(NUM_CAM_HM):
             # current video reader not matched
             if self.matte_video_readers[i].current_video != matte_videos[i]:
@@ -315,6 +317,126 @@ class Human36RGB(Dataset):
         train = range(self.training_length)
         test = range(self.training_length, self.length)
         return train, test
+
+
+class Human36RGBV(Dataset):
+    """
+    Read processed volume data from Human3.6M dataset.
+    """
+    def __init__(self,root_path):
+        self.data_augmentation = False
+        self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
+        self.subjects.sort()
+        # self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
+        self.subjects = ['S1','S9']
+        self.length = 0
+        #self.training_subjects = ['S1','S5','S6','S7','S8']
+        self.training_subjects = ['S1']
+        #self.test_subjects = ['S9','S11']
+        self.test_subjects = ['S9']
+        # self.test_subjects = []
+
+        # encapsulate into class
+        self.subjects = [Subject(i) for i in self.subjects]
+        self.training_subjects = [Subject(i) for i in self.training_subjects]
+        self.test_subjects = [Subject(i) for i in self.test_subjects]
+
+        self.data_dict = {}
+        self.data = []
+        self.test_lengths = []
+
+        # for i in range(len(self.training_subjects)):
+        #     self.training_subjects[i].actionName = self.training_subjects[i].actionName[:1]
+        # self.test_subjects[0].actionName = self.test_subjects[0].actionName[:1]
+        print 'load training set'
+        for sub in self.training_subjects:
+            self.data_dict[sub.name] = {}
+            for act in sub.actionName:
+                print 'load',sub.name,act,
+                self.data_dict[sub.name][act] = {}
+
+                p = os.path.join(root_path, sub.name,'Videos',act,'*.npz')
+                lines = glob.glob(p)
+                lines.sort()
+                if lines is None or len(lines) == 0:
+                    print '0 loaded'
+                    continue
+                for i in range(len(lines)):
+                    self.data.append(lines[i])
+                print len(lines),'loaded'
+                self.length += len(lines)
+        self.training_length = self.length
+
+        # load test set
+        print 'load test set'
+        for sub in self.test_subjects:
+            self.data_dict[sub] = {}
+            for act in sub.actionName:
+                print 'load', sub, act,
+                self.data_dict[sub][act] = {}
+                p = os.path.join(root_path, sub.name,'Videos',act,'*.npz')
+                lines = glob.glob(p)
+                lines.sort()
+                if lines is None or len(lines) == 0:
+                    print '0 loaded'
+                    continue
+                for i in range(len(lines)):
+                    self.data.append(lines[i])
+                print len(lines),'loaded'
+                self.test_lengths.append(len(lines))
+                self.length += len(lines)
+        self.test_length = self.length-self.training_length
+        # self.subjects_length.append(sub_len)
+
+    def __getitem__(self, item):
+        d = self.data[item]
+        npz = np.load(d)
+        pvh, label, mid, leng = npz['mcv'],npz['label'],npz['mid'],npz['len']
+        pvh = pvh.astype(np.float32)
+        if nCHANNEL == 16:
+            pvh[0:3, :, :, :] = pvh[0:3, :, :, :] / 255
+            pvh[4:7, :, :, :] = pvh[4:7, :, :, :] / 255
+            pvh[8:11, :, :, :] = pvh[8:11, :, :, :] / 255
+            pvh[12:15, :, :, :] = pvh[12:15, :, :, :] / 255
+        elif nCHANNEL == 12:
+            pvh[0:3, :, :, :] = pvh[0:3, :, :, :] / 255
+            pvh[3:6, :, :, :] = pvh[4:7, :, :, :] / 255
+            pvh[6:9, :, :, :] = pvh[8:11, :, :, :] / 255
+            pvh[9:12, :, :, :] = pvh[12:15, :, :, :] / 255
+            pvh = pvh[0:12,:,:,:]
+
+        # if self.data_augmentation:
+        #     pvh = random_cut(pvh)
+        pvh = torch.from_numpy(pvh).cuda()
+        # if self.data_augmentation:
+        #     pvh,label,mid,leng = data_augmentation3D(pvh,label,mid,leng)
+
+        return pvh,label,mid.astype(np.float32),leng.reshape((1)).astype(np.float32)
+
+    def __len__(self):
+        return self.length
+
+    def get_subset(self,start,end):
+        sub = range(int(self.length * start), int(self.length*end))
+        return sub
+
+    def get_train_test(self):
+        """
+        get train test dataset
+        :return: train indices, test indices
+        """
+        train = range(self.training_length)
+        test = range(self.training_length,self.length)
+        return train,test
+
+    def get_config(self):
+        """
+        :return: training subjects, test subjects
+        """
+        s = reduce((lambda x,y:x+y),self.subjects)
+        ts = reduce((lambda x,y:x+y),self.test_subjects)
+        return s,ts
+
 
 
 

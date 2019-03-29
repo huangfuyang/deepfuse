@@ -94,13 +94,14 @@ def train_human(full = False):
             print("=> no checkpoint found at '{}'".format(args.resume))
 
     #dataset = Human36V(HM_PATH)
-    dataset = Human36RGB(HM_PATH)
+    dataset = Human36RGBV(HM_RGB_PATH)
     dataset.data_augmentation = True
 
     train_idx, valid_idx = dataset.get_train_test()
     # train_idx = range(2)
     train_sampler = SubsetRandomSampler(train_idx)
     test_sampler = SubsetSampler(valid_idx)
+
 
     if full:
         train_loader = torch.utils.data.DataLoader(dataset,
@@ -218,6 +219,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     end = time()
     for i, s in enumerate(train_loader):
         data, label, mid, leng= s
+        #c1,c2,c3,c4 = data.cpu()
 
         # measure data loading time
         data_time.update(time() - end)
@@ -238,6 +240,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         loss = criterion(output[0], target_var)
         for k in range(1, nSTACK):
             loss += criterion(output[k], target_var)
+            print loss
         losses.update(loss.item()/batch_size, 1)
         # compute gradient
         optimizer.zero_grad()
