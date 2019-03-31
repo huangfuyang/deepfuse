@@ -418,15 +418,15 @@ if __name__ == "__main__":
     init_parser()
     np.set_printoptions(precision=3,suppress=True)
     torch.cuda.set_device(args.gpu_id)
-
+    #drawcirclecv
     # generate mcv
     # preprocess()
 
     # train and test human3.6
-    train_human()
+    #train_human()
 
     # test only and save result
-    #test_human('/home/alzeng/remote/fyhuang/alzeng/deepfuse/test_model/checkpoint.5e-5.21_p2.tar')
+    test_human('/home/alzeng/remote/fyhuang/alzeng/deepfuse/test_model/checkpoint.5e-5.21_p2.tar')
 
     # check volume in 3D
     # check_volume()
