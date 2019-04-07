@@ -1,3 +1,4 @@
+from __future__ import division
 from torch.utils.data import Dataset,DataLoader
 import numpy as np
 import os,glob
@@ -327,13 +328,13 @@ class Human36RGBV(Dataset):
         self.data_augmentation = False
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
-        # self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-        self.subjects = ['S1','S9','S11']
+        self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
+        #self.subjects = ['S1','S9','S11']
         self.length = 0
-        #self.training_subjects = ['S1','S5','S6','S7','S8']
-        self.training_subjects = ['S1']
-        #self.test_subjects = ['S9','S11']
-        self.test_subjects = ['S11']
+        self.training_subjects = ['S1','S5','S6','S7','S8']
+        #self.training_subjects = ['S1']
+        self.test_subjects = ['S9','S11']
+        #self.test_subjects = ['S11']
         # self.test_subjects = []
 
         # encapsulate into class
@@ -349,23 +350,27 @@ class Human36RGBV(Dataset):
         #     self.training_subjects[i].actionName = self.training_subjects[i].actionName[:1]
         # self.test_subjects[0].actionName = self.test_subjects[0].actionName[:1]
         print 'load training set'
+
+        prev_joints = np.zeros((32,3),float)
+        threshold = 40**2    # Skip frames until at least one joint has moved by 40mm
         for sub in self.training_subjects:
             self.data_dict[sub.name] = {}
             for act in sub.actionName:
                 print 'load',sub.name,act,
                 self.data_dict[sub.name][act] = {}
-
                 p = os.path.join(root_path, sub.name,'Videos',act,'*.npz')
                 lines = glob.glob(p)
                 lines.sort()
+                # If you do not use the 30mm,just downsampling from 50fps/s to 10fps/s
                 if lines is None or len(lines) == 0:
                     print '0 loaded'
                     continue
-                for i in range(len(lines)):
+                for i in range(0, len(lines), 5):
                     self.data.append(lines[i])
-                print len(lines),'loaded'
-                self.length += len(lines)
+                print len(lines), 'loaded'
+                self.length += ((len(lines) - 1) // 5) + 1
         self.training_length = self.length
+        print 'training_length is', self.training_length
 
         # load test set
         print 'load test set'
@@ -380,13 +385,13 @@ class Human36RGBV(Dataset):
                 if lines is None or len(lines) == 0:
                     print '0 loaded'
                     continue
-                for i in range(len(lines)):
+                for i in range(0,len(lines),64):
                     self.data.append(lines[i])
                 print len(lines),'loaded'
-                self.test_lengths.append(len(lines))
-                self.length += len(lines)
+                self.test_lengths.append(((len(lines)-1)//64)+1)
+                self.length += ((len(lines)-1)//64)+1
         self.test_length = self.length-self.training_length
-        # self.subjects_length.append(sub_len)
+	print 'test length is:',self.test_length       # self.subjects_length.append(sub_len)
 
     def __getitem__(self, item):
         d = self.data[item]
@@ -399,10 +404,10 @@ class Human36RGBV(Dataset):
             pvh[8:11, :, :, :] = pvh[8:11, :, :, :] / 255
             pvh[12:15, :, :, :] = pvh[12:15, :, :, :] / 255
         elif nCHANNEL == 12:
-            pvh[0:3, :, :, :] = pvh[0:3, :, :, :] / 255
-            pvh[3:6, :, :, :] = pvh[4:7, :, :, :] / 255
-            pvh[6:9, :, :, :] = pvh[8:11, :, :, :] / 255
-            pvh[9:12, :, :, :] = pvh[12:15, :, :, :] / 255
+            pvh[0:3, :, :, :] = pvh[0:3, :, :, :] /255
+            pvh[3:6, :, :, :] = pvh[4:7, :, :, :] /255
+            pvh[6:9, :, :, :] = pvh[8:11, :, :, :]/255
+            pvh[9:12, :, :, :] = pvh[12:15, :, :, :]/255
             pvh = pvh[0:12,:,:,:]
 
         # if self.data_augmentation:
@@ -436,6 +441,7 @@ class Human36RGBV(Dataset):
         s = reduce((lambda x,y:x+y),self.subjects)
         ts = reduce((lambda x,y:x+y),self.test_subjects)
         return s,ts
+
 
 
 
@@ -490,9 +496,9 @@ def check_volume():
 
 
 if __name__ == '__main__':
-    ds = Human36RGB(HM_PATH)
-    print len(ds)
-    ds[0]
+    ds = Human36RGBV(HM_RGB_PATH)
+   # print len(ds)
+    #ds[0]
 # preprocess()
 # show_raw()
 #check_volume()

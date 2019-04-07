@@ -13,6 +13,7 @@ from time import time
 from model.FUSENet import FuseNet
 from helper import AverageMeter,timeit
 from metrics import mean_error
+from torchvision.transforms import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from subset_sampler import SubsetSampler
 
@@ -156,7 +157,7 @@ def train_human(full = False):
             'state_dict': net.state_dict(),
             'best_acc': best_err,
             'optimizer': optimizer.state_dict(),
-        }, is_best, 'checkpoint1.{}.tar'.format(args.name))
+        }, is_best, 'checkpoint/checkpoint_{0}_{1}.{2}.tar'.format(epoch,set_learning_rate(optimizer),args.name))
 
     '''    if epoch % DECAY_EPOCH == 0:
             save_checkpoint({
@@ -182,7 +183,7 @@ def test_human(path):
     fusenet.load_state_dict(checkpoint['state_dict'])
     fusenet.eval()
 
-    dataset = Human36RGB(HM_PATH)
+    dataset = Human36RGBV(HM_RGB_PATH)
     dataset.data_augmentation = False
     criterion = nn.MSELoss().cuda()
     best_acc = checkpoint['best_acc']
@@ -205,7 +206,7 @@ def test_human(path):
     print("final accuracy {:3f}".format(acc))
     print("total time: ", datetime.timedelta(seconds=(time() - start_time)).seconds, 's')
     if save is True:
-        np.savez_compressed('result/human.npz',result=r,label=l)
+        np.savez_compressed('result/human_p2_c12.npz',result=r,label=l)
 
 
 def train(train_loader, model, criterion, optimizer, epoch):
@@ -423,10 +424,10 @@ if __name__ == "__main__":
     # preprocess()
 
     # train and test human3.6
-    #train_human()
+    train_human()
 
     # test only and save result
-    test_human('/home/alzeng/remote/fyhuang/alzeng/deepfuse/test_model/checkpoint.5e-5.21_p2.tar')
+    #test_human('/home/alzeng/remote/fyhuang/alzeng/new_deepfuse/deepfuse/model_best.p2_c12_5e.tar')
 
     # check volume in 3D
     # check_volume()
