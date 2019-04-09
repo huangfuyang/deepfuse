@@ -67,11 +67,14 @@ class FuseNet(nn.Module):
         self.nStack = nStack
         self.nModules = nModules
         self.nFeats = nFeats
-        self.conv1_ = nn.Conv3d(nCHANNEL, self.nFeats/2, bias=True, kernel_size=3, stride=2, padding=1)
+        # self.conv1_ = nn.Conv3d(nCHANNEL, self.nFeats/2, bias=True, kernel_size=3, stride=2, padding=1)
+        self.conv1_ = nn.Conv3d(nCHANNEL, self.nFeats, bias=True, kernel_size=3, stride=2, padding=1)
         # self.conv1_ = nn.Conv3d(1, 64, bias = True, kernel_size = 7, stride = 2, padding = 3)
-        self.bn1 = nn.BatchNorm3d(self.nFeats/2)
+        # self.bn1 = nn.BatchNorm3d(self.nFeats/2)
+        self.bn1 = nn.BatchNorm3d(self.nFeats)
         self.relu = nn.ReLU(inplace=True)
-        self.r1 = Res3D(self.nFeats/2, self.nFeats)
+        # self.r1 = Res3D(self.nFeats/2, self.nFeats)
+        self.r1 = Res3D(self.nFeats, self.nFeats)
         self.maxpool = nn.MaxPool3d(kernel_size=2, stride=2)
         self.r4 = Res3D(self.nFeats, self.nFeats)
         self.r5 = Res3D(self.nFeats, self.nFeats)

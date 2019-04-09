@@ -2,6 +2,7 @@ import argparse
 import datetime
 import shutil
 import warnings
+import os
 import sys
 import torch
 import torch.nn as nn
@@ -16,6 +17,7 @@ from metrics import mean_error
 from torchvision.transforms import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from subset_sampler import SubsetSampler
+from parallel import DataParallelModel, DataParallelCriterion
 
 # init setting
 def init_parser():
@@ -64,11 +66,17 @@ def warning_init():
 
 # main body
 def train_human(full = False):
-    net = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
+    Fuse = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
+  #  net = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
+    net = nn.DataParallel(Fuse)
     warning_init()
     start_time = time()
-    net.cuda()
+ #   net.cuda()
+  #  net = nn.DataParallel(net)
+    net.to(device)
+    #net = DataParallelModel(net)
     criterion = nn.MSELoss().cuda()
+    criterion = DataParallelCriterion(criterion)
     best_err = 99990
     optimizer_rms = optim.RMSprop(net.parameters(),
                                   lr=args.learning_rate,
@@ -157,7 +165,7 @@ def train_human(full = False):
             'state_dict': net.state_dict(),
             'best_acc': best_err,
             'optimizer': optimizer.state_dict(),
-        }, is_best, 'checkpoint/checkpoint_{0}_{1}.{2}.tar'.format(epoch,set_learning_rate(optimizer),args.name))
+        }, is_best, 'checkpoint/checkpoint_{0}.{1}.tar'.format(epoch,args.name))
 
     '''    if epoch % DECAY_EPOCH == 0:
             save_checkpoint({
@@ -175,7 +183,6 @@ def train_human(full = False):
 
 def test_human(path):
     start_time = time()
-
     save = True
     checkpoint = torch.load(path, map_location=torch.device('cpu'))
     fusenet = FuseNet(nSTACK, nModule, nFEAT,JOINT_LEN_HM)
@@ -186,6 +193,7 @@ def test_human(path):
     dataset = Human36RGBV(HM_RGB_PATH)
     dataset.data_augmentation = False
     criterion = nn.MSELoss().cuda()
+  #  criterion = DataParallelCriterion(criterion)
     best_acc = checkpoint['best_acc']
     print ("using model with acc [{:.2f}]".format(best_acc))
 
@@ -225,10 +233,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # measure data loading time
         data_time.update(time() - end)
         batch_size = data.size(0)
-        input_var = torch.autograd.Variable(data.cuda().float())
+        input_var = torch.autograd.Variable(data.to(device).float())
         # input_quat_var = torch.autograd.Variable(quat.cuda())
-        target_var = torch.autograd.Variable(label.cuda())
-        output = model(input_var)
+        target_var = torch.autograd.Variable(label.to(device))
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs")
+            output = model(input_var)
+
         # record loss
         # leng is voxel length
         leng = leng*(NUM_VOXEL/NUM_GT_SIZE)
@@ -414,11 +425,13 @@ def check_volume():
         base = base.repeat(1, JOINT_LEN)
         plot_voxel_label(s, (label - base) / (leng / (NUM_VOXEL / NUM_GT_SIZE)))
 
-
 if __name__ == "__main__":
     init_parser()
     np.set_printoptions(precision=3,suppress=True)
-    torch.cuda.set_device(args.gpu_id)
+    #torch.cuda.set_device(args.gpu_id)
+    #os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+    #device_ids = [0, 1, 2, 3]
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #drawcirclecv
     # generate mcv
     # preprocess()
