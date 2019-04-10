@@ -279,6 +279,7 @@ class Human36V(Dataset):
                 print len(lines),'loaded'
                 self.length += len(lines)
         self.training_length = self.length
+
         # load test set
         print 'load test set'
         for sub in self.test_subjects:

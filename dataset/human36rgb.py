@@ -1,3 +1,4 @@
+from __future__ import division
 from torch.utils.data import Dataset,DataLoader
 import numpy as np
 import os,glob
@@ -67,8 +68,8 @@ class Subject(object):
         self.videoName.sort()
         self.gtName.sort()
         self.pvhName.sort()
-        # print self.videoName
-        # print self.gtName
+       # print self.videoName
+       # print self.pvhName
         for f in self.videoName:
             aname = f.split('.')[0]
             if aname not in self.actionDict:
@@ -79,8 +80,8 @@ class Subject(object):
         else:
             self.actionName = self.actionDict.keys()
             self.actionName.sort()
-        # print self.actionName
-        # print self.actionDict[self.actionName[0]]
+        #print self.actionName
+        #print self.actionDict[self.actionName[0]] # ['Directions.csv', 'Directions.54138969.mp4', 'Directions.55011271.mp4', 'Directions.58860488.mp4', 'Directions.60457274.mp4']
 
     def select_action(self, num):
         """
@@ -96,6 +97,7 @@ class Subject(object):
         gtfile = self.actionDict[actionName][0]
         gtfile = os.path.join(self._gtpath,gtfile)
         gt = np.loadtxt(gtfile,dtype=np.str, delimiter=',')[:,:-1].astype(np.float32)
+        #print gt
         # with h5py.File(gtfile, 'r') as hf:
         #     points = hf[hf.keys()[0]][()]
         # return [os.path.join(self._bspath,x) for x in self.actionDict[actionName][1:]], points.T
@@ -120,9 +122,15 @@ class Human36RGB(Dataset):
         self.current_video = ""
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
-        # self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-        self.subjects = ['S1']
+        self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
+      #  self.training_subjects = ['S1','S5','S6','S7','S8']
+      #  self.test_subjects = ['S9','S11']
+        self.training_subjects = ['S1']
+        self.test_subjects = ['S9']
+        #self.subjects = ['S1']
         self.subjects = [Subject(i) for i in self.subjects]
+        self.training_subjects = [Subject(i) for i in self.training_subjects]
+        self.test_subjects = [Subject(i) for i in self.test_subjects]
 
         self.data_dict = {}
         self.data = []
@@ -132,52 +140,82 @@ class Human36RGB(Dataset):
         self.frame_data = [None]*NUM_CAM_HM*2
         self.save = False
         self.raw = False
+ #       self.test_lengths = [] #list for each subject and action in testset
         # self.subjects[0].actionName = ['Directions']
         self.cams = load_cameras(os.path.join(HM_PATH,'cameras.h5'))
-        for sub in self.subjects:
+        print 'load training set :'
+        for sub in self.training_subjects:
             self.data_dict[sub.name] = {}
             # self.data_dict[sub]['camera'] = self.cams[sub]
             for act in sub.actionName:
                 self.data_dict[sub.name][act] = {}
-                print 'load',sub,act
-                matte_videos,rgb_videos, label = sub.select_action(act)
-                lines = label.shape[0]
+                print 'load',sub,act  # load S1 Directions + kpts location
+                matte_videos,rgb_videos, label = sub.select_action(act) # four matte & rgb videos once ,__len__ = 4;;label shape= <type'tuple'>:(1612,96)
+                lines = label.shape[0] # eg.1612
                 self.data_dict[sub.name][act]['label'] = label
                 self.data_dict[sub.name][act]['matte_video'] = matte_videos
                 self.data_dict[sub.name][act]['rgb_video'] = rgb_videos
                 for i in range(lines):
                     self.data.append([sub.name, act, i])
+                #print lines, 'loaded'
                 self.length += lines
-        print self.length,'data loaded'
+        self.training_length = self.length
+        print 'training length is :', self.training_length
+        # load test set
+        print 'load test set :'
+        for sub in self.test_subjects:
+            self.data_dict[sub.name] = {}
+            # self.data_dict[sub]['camera'] = self.cams[sub]
+            for act in sub.actionName:
+                self.data_dict[sub.name][act] = {}
+                print 'load',sub,act  # load S1 Directions + kpts location
+                matte_videos,rgb_videos, label = sub.select_action(act) # four matte & rgb videos once ,__len__ = 4;;label shape= <type'tuple'>:(1612,96)
+                lines = label.shape[0] # eg.1612
+                self.data_dict[sub.name][act]['label'] = label
+                self.data_dict[sub.name][act]['matte_video'] = matte_videos
+                self.data_dict[sub.name][act]['rgb_video'] = rgb_videos
+                for i in range(lines):
+                    self.data.append([sub.name, act, i])
+               # print lines, 'loaded'
+
+               # self.test_lengths.append(lines)
+                self.length += lines
+        self.test_length = self.length-self.training_length
+        print 'test length is :',self.test_length
+        print 'total length is: ',self.length
+
         # load camera params
         # self.subjects_length.append(sub_len)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item): #eg. in S1,item is from 0 to 62094 frames
         """
         get specific frame
         :param item: index of frame
         :return:
         """
         global t
-        info = self.data[item]
+        info = self.data[item] #type(info)=list:['S1','Directions',item]
         # info = [sub.name, act, i]
         data = self.data_dict[info[0]][info[1]]
         index = info[2]
         matte_videos = data['matte_video']
         rgb_videos = data['rgb_video']
-        label = data['label'][index]
+        label = data['label'][index] # [index,96] the index/th row info,(96,)
         d_path = os.path.join(os.sep, os.path.join(*rgb_videos[0].split(os.sep)[1:-1]),info[1])
         np_path = os.path.join(d_path, str(index).zfill(5)+'.npz')
         if not self.raw and os.path.isfile(np_path):
             npz = np.load(np_path)
-            mcv, label, mid, leng = npz['mcv'], npz['label'], npz['mid'], npz['len']
-            return mcv, label, mid, leng.reshape((1))
+            mcv, label, mid, leng = npz['mcv'], npz['label'], npz['mid'], npz['len'] #mcv:,label:(96,),mid:(3,),len:(1,)
+            mcv = mcv.astype(np.uint8)
+            mcv = torch.from_numpy(mcv).cuda().float()
+            return mcv, label.astype(np.float32), mid.astype(np.float32), leng.reshape((1)).astype(np.float32)
         for i in range(NUM_CAM_HM):
             # current video reader not matched
             if self.matte_video_readers[i].current_video != matte_videos[i]:
                 self.matte_video_readers[i].current_video = matte_videos[i]
                 self.rgb_video_readers[i].current_video = rgb_videos[i]
 
+                # set keys and values for parameters in ffmpeg
                 inputparameters = {}
                 outputparameters = {}
                 outputparameters['-pix_fmt'] = 'gray'
@@ -272,6 +310,140 @@ class Human36RGB(Dataset):
     def __len__(self):
         return len(self.data)
 
+    def get_train_test(self):
+        """
+        get train test dataset
+        :return: train indices, test indices
+        """
+        train = range(self.training_length)
+        test = range(self.training_length, self.length)
+        return train, test
+
+
+class Human36RGBV(Dataset):
+    """
+    Read processed volume data from Human3.6M dataset.
+    """
+    def __init__(self,root_path):
+        self.data_augmentation = False
+        self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
+        self.subjects.sort()
+        #self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
+        self.subjects = ['S1','S9','S11']
+        self.length = 0
+        #self.training_subjects = ['S1','S5','S6','S7','S8']
+        self.training_subjects = ['S1']
+        #self.test_subjects = ['S9','S11']
+        self.test_subjects = ['S11']
+        # self.test_subjects = []
+
+        # encapsulate into class
+        self.subjects = [Subject(i) for i in self.subjects]
+        self.training_subjects = [Subject(i) for i in self.training_subjects]
+        self.test_subjects = [Subject(i) for i in self.test_subjects]
+
+        self.data_dict = {}
+        self.data = []
+        self.test_lengths = []
+
+        # for i in range(len(self.training_subjects)):
+        #     self.training_subjects[i].actionName = self.training_subjects[i].actionName[:1]
+        # self.test_subjects[0].actionName = self.test_subjects[0].actionName[:1]
+        print 'load training set'
+
+        prev_joints = np.zeros((32,3),float)
+        threshold = 40**2    # Skip frames until at least one joint has moved by 40mm
+        for sub in self.training_subjects:
+            self.data_dict[sub.name] = {}
+            for act in sub.actionName:
+                print 'load',sub.name,act,
+                self.data_dict[sub.name][act] = {}
+                p = os.path.join(root_path, sub.name,'Videos',act,'*.npz')
+                lines = glob.glob(p)
+                lines.sort()
+                # If you do not use the 30mm,just downsampling from 50fps/s to 10fps/s
+                if lines is None or len(lines) == 0:
+                    print '0 loaded'
+                    continue
+                for i in range(0, len(lines), 5):
+                    self.data.append(lines[i])
+                print len(lines), 'loaded'
+                self.length += ((len(lines) - 1) // 5) + 1
+        self.training_length = self.length
+        print 'training_length is', self.training_length
+
+        # load test set
+        print 'load test set'
+        for sub in self.test_subjects:
+            self.data_dict[sub] = {}
+            for act in sub.actionName:
+                print 'load', sub, act,
+                self.data_dict[sub][act] = {}
+                p = os.path.join(root_path, sub.name,'Videos',act,'*.npz')
+                lines = glob.glob(p)
+                lines.sort()
+                if lines is None or len(lines) == 0:
+                    print '0 loaded'
+                    continue
+                for i in range(0,len(lines),64):
+                    self.data.append(lines[i])
+                print len(lines),'loaded'
+                self.test_lengths.append(((len(lines)-1)//64)+1)
+                self.length += ((len(lines)-1)//64)+1
+        self.test_length = self.length-self.training_length
+	print 'test length is:',self.test_length       # self.subjects_length.append(sub_len)
+
+    def __getitem__(self, item):
+        d = self.data[item]
+        npz = np.load(d)
+        pvh, label, mid, leng = npz['mcv'],npz['label'],npz['mid'],npz['len']
+        pvh = pvh.astype(np.float32)
+        if nCHANNEL == 16:
+            pvh[0:3, :, :, :] = pvh[0:3, :, :, :] / 255
+            pvh[4:7, :, :, :] = pvh[4:7, :, :, :] / 255
+            pvh[8:11, :, :, :] = pvh[8:11, :, :, :] / 255
+            pvh[12:15, :, :, :] = pvh[12:15, :, :, :] / 255
+        elif nCHANNEL == 12:
+            pvh[0:3, :, :, :] = pvh[0:3, :, :, :] /255
+            pvh[3:6, :, :, :] = pvh[4:7, :, :, :] /255
+            pvh[6:9, :, :, :] = pvh[8:11, :, :, :]/255
+            pvh[9:12, :, :, :] = pvh[12:15, :, :, :]/255
+            pvh = pvh[0:12,:,:,:]
+
+        # if self.data_augmentation:
+        #     pvh = random_cut(pvh)
+        pvh = torch.from_numpy(pvh).cuda()
+        # if self.data_augmentation:
+        #     pvh,label,mid,leng = data_augmentation3D(pvh,label,mid,leng)
+
+        return pvh,label,mid.astype(np.float32),leng.reshape((1)).astype(np.float32)
+
+    def __len__(self):
+        return self.length
+
+    def get_subset(self,start,end):
+        sub = range(int(self.length * start), int(self.length*end))
+        return sub
+
+    def get_train_test(self):
+        """
+        get train test dataset
+        :return: train indices, test indices
+        """
+        train = range(self.training_length)
+        test = range(self.training_length,self.length)
+        return train,test
+
+    def get_config(self):
+        """
+        :return: training subjects, test subjects
+        """
+        s = reduce((lambda x,y:x+y),self.subjects)
+        ts = reduce((lambda x,y:x+y),self.test_subjects)
+        return s,ts
+
+
+
 
 
 def preprocess():
@@ -310,10 +482,10 @@ def check_volume():
         label = torch.from_numpy(label)
         mid = torch.from_numpy(mid)
         leng = torch.from_numpy(leng)
-        print data.shape, label.shape, mid.shape, leng.shape
+        print data.shape, label.shape, mid.shape, leng.shape #(16,64,64,64)(96,) (3,)(1,)
         # s = data.sum(dim=0)
         # s[s < 4] = 0
-        for j in data:
+        for j in data: # j.shape :(64,64,64)
             plot_voxel(j)
         # leng = leng * (NUM_VOXEL / NUM_GT_SIZE)
         # base = mid - leng.repeat(1, 3) * (NUM_GT_SIZE / 2 - 0.5)
@@ -322,7 +494,11 @@ def check_volume():
         # plot_voxel_label(s, (label - base) / (leng / (NUM_VOXEL / NUM_GT_SIZE)))
 
 
+
 if __name__ == '__main__':
-    preprocess()
-    # show_raw()
-    # check_volume()
+    ds = Human36RGBV(HM_RGB_PATH)
+   # print len(ds)
+    #ds[0]
+# preprocess()
+# show_raw()
+#check_volume()

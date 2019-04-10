@@ -2,19 +2,22 @@ import argparse
 import datetime
 import shutil
 import warnings
+import os
 import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from dataset.human36 import *
+from dataset.human36rgb import *
 from params import *
 from server_setting import *
 from time import time
 from model.FUSENet import FuseNet
 from helper import AverageMeter,timeit
 from metrics import mean_error
+from torchvision.transforms import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from subset_sampler import SubsetSampler
+from parallel import DataParallelModel, DataParallelCriterion
 
 # init setting
 def init_parser():
@@ -63,11 +66,17 @@ def warning_init():
 
 # main body
 def train_human(full = False):
-    net = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
+    Fuse = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
+  #  net = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
+    net = nn.DataParallel(Fuse)
     warning_init()
     start_time = time()
-    net.cuda()
+ #   net.cuda()
+  #  net = nn.DataParallel(net)
+    net.to(device)
+    #net = DataParallelModel(net)
     criterion = nn.MSELoss().cuda()
+    criterion = DataParallelCriterion(criterion)
     best_err = 99990
     optimizer_rms = optim.RMSprop(net.parameters(),
                                   lr=args.learning_rate,
@@ -93,13 +102,15 @@ def train_human(full = False):
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
-    dataset = Human36V(HM_PATH)
+    #dataset = Human36V(HM_PATH)
+    dataset = Human36RGBV(HM_RGB_PATH)
     dataset.data_augmentation = True
 
     train_idx, valid_idx = dataset.get_train_test()
     # train_idx = range(2)
     train_sampler = SubsetRandomSampler(train_idx)
     test_sampler = SubsetSampler(valid_idx)
+
 
     if full:
         train_loader = torch.utils.data.DataLoader(dataset,
@@ -154,15 +165,16 @@ def train_human(full = False):
             'state_dict': net.state_dict(),
             'best_acc': best_err,
             'optimizer': optimizer.state_dict(),
-        }, is_best, 'checkpoint.{}.tar'.format(args.name))
-        if epoch % DECAY_EPOCH == 0:
+        }, is_best, 'checkpoint/checkpoint_{0}.{1}.tar'.format(epoch,args.name))
+
+    '''    if epoch % DECAY_EPOCH == 0:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': '3dHMP',
                 'state_dict': net.state_dict(),
                 'best_acc': best_err,
                 'optimizer': optimizer.state_dict(),
-            }, False, path)
+            }, False, path)  '''
             # if not is_best:
             #     lower_learning_rate(optimizer,DECAY_RATIO)
 
@@ -171,7 +183,6 @@ def train_human(full = False):
 
 def test_human(path):
     start_time = time()
-
     save = True
     checkpoint = torch.load(path, map_location=torch.device('cpu'))
     fusenet = FuseNet(nSTACK, nModule, nFEAT,JOINT_LEN_HM)
@@ -179,9 +190,10 @@ def test_human(path):
     fusenet.load_state_dict(checkpoint['state_dict'])
     fusenet.eval()
 
-    dataset = Human36V(HM_PATH)
+    dataset = Human36RGBV(HM_RGB_PATH)
     dataset.data_augmentation = False
     criterion = nn.MSELoss().cuda()
+  #  criterion = DataParallelCriterion(criterion)
     best_acc = checkpoint['best_acc']
     print ("using model with acc [{:.2f}]".format(best_acc))
 
@@ -202,7 +214,7 @@ def test_human(path):
     print("final accuracy {:3f}".format(acc))
     print("total time: ", datetime.timedelta(seconds=(time() - start_time)).seconds, 's')
     if save is True:
-        np.savez_compressed('result/human.npz',result=r,label=l)
+        np.savez_compressed('result/human_p2_c12.npz',result=r,label=l)
 
 
 def train(train_loader, model, criterion, optimizer, epoch):
@@ -216,14 +228,18 @@ def train(train_loader, model, criterion, optimizer, epoch):
     end = time()
     for i, s in enumerate(train_loader):
         data, label, mid, leng= s
+        #c1,c2,c3,c4 = data.cpu()
 
         # measure data loading time
         data_time.update(time() - end)
         batch_size = data.size(0)
-        input_var = torch.autograd.Variable(data.cuda().float())
+        input_var = torch.autograd.Variable(data.to(device).float())
         # input_quat_var = torch.autograd.Variable(quat.cuda())
-        target_var = torch.autograd.Variable(label.cuda())
-        output = model(input_var)
+        target_var = torch.autograd.Variable(label.to(device))
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs")
+            output = model(input_var)
+
         # record loss
         # leng is voxel length
         leng = leng*(NUM_VOXEL/NUM_GT_SIZE)
@@ -236,6 +252,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         loss = criterion(output[0], target_var)
         for k in range(1, nSTACK):
             loss += criterion(output[k], target_var)
+            print loss
         losses.update(loss.item()/batch_size, 1)
         # compute gradient
         optimizer.zero_grad()
@@ -356,7 +373,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
 
 # pre process multi-channel volume data from video
 def preprocess():
-    data = Human36(HM_PATH)
+    data = Human36RGB(HM_PATH)
     data.save = True
     for i in range(len(data)):
         d = data[i]
@@ -365,7 +382,7 @@ def preprocess():
 # visualization data
 def check_raw(index):
     from visualization import drawcirclecv
-    ds = Human36(HM_PATH)
+    ds = Human36RGB(HM_PATH)
     ds.save = False
     ds.raw = True
 
@@ -377,7 +394,6 @@ def check_raw(index):
         # print frames[0].shape
         # print label
         for j in range(len(frames)):
-
             gt = ds.cams['S1'][j].world2pix(torch.from_numpy(label).float().cuda())
             # print gt
             fc = frames[j].copy()
@@ -390,7 +406,7 @@ def check_raw(index):
 
 def check_volume():
     from visualization import plot_voxel_label,plot_voxel
-    ds = Human36V(HM_PATH)
+    ds = Human36RGB(HM_PATH)
     ds.data_augmentation = False
     for i in range(0,1):
         data, label, mid, leng= ds[i]
@@ -409,12 +425,14 @@ def check_volume():
         base = base.repeat(1, JOINT_LEN)
         plot_voxel_label(s, (label - base) / (leng / (NUM_VOXEL / NUM_GT_SIZE)))
 
-
 if __name__ == "__main__":
     init_parser()
     np.set_printoptions(precision=3,suppress=True)
-    torch.cuda.set_device(args.gpu_id)
-
+    #torch.cuda.set_device(args.gpu_id)
+    #os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+    #device_ids = [0, 1, 2, 3]
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #drawcirclecv
     # generate mcv
     # preprocess()
 
@@ -422,7 +440,7 @@ if __name__ == "__main__":
     train_human()
 
     # test only and save result
-    # test_human('checkpoint/human36_51.tar')
+    #test_human('/home/alzeng/remote/fyhuang/alzeng/new_deepfuse/deepfuse/model_best.p2_c12_5e.tar')
 
     # check volume in 3D
     # check_volume()
