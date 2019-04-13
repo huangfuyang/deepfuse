@@ -436,7 +436,7 @@ def check_volume():
 if __name__ == "__main__":
     init_parser()
     np.set_printoptions(precision=3,suppress=True)
-    #torch.cuda.set_device(args.gpu_id)
+    torch.cuda.set_device(args.gpu_id)
     #os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
     #device_ids = [0, 1, 2, 3]
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
