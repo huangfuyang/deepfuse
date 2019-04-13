@@ -123,10 +123,10 @@ class Human36RGB(Dataset):
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
         self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-        self.training_subjects = ['S1','S5','S6','S7','S8']
-        self.test_subjects = ['S9','S11']
-        # self.training_subjects = ['S1']
-        # self.test_subjects = ['S9']
+        # self.training_subjects = ['S1','S5','S6','S7','S8']
+        # self.test_subjects = ['S9','S11']
+        self.training_subjects = ['S1']
+        self.test_subjects = []
         #self.subjects = ['S1']
         self.subjects = [Subject(i) for i in self.subjects]
         self.training_subjects = [Subject(i) for i in self.training_subjects]
@@ -221,7 +221,10 @@ class Human36RGB(Dataset):
             if self.matte_video_readers[i].current_video != matte_videos[i]:
                 self.matte_video_readers[i].current_video = matte_videos[i]
                 self.rgb_video_readers[i].current_video = rgb_videos[i]
-
+                if not os.path.isfile(self.rgb_video_readers[i].current_video):
+                    self.matte_video_readers[i].current_video = None
+                    # print("file not found",self.rgb_video_readers[i].current_video)
+                    return None
                 # set keys and values for parameters in ffmpeg
                 inputparameters = {}
                 outputparameters = {}
@@ -232,9 +235,7 @@ class Human36RGB(Dataset):
                 if self.rgb_video_readers[i].readers is skvideo.io.FFmpegReader:
                     self.rgb_video_readers[i].readers.close()
 
-                if not os.path.isfile(self.rgb_video_readers[i].current_video):
-                    print("file not found",self.rgb_video_readers[i].current_video)
-                    return None
+
                 self.matte_video_readers[i].readers = skvideo.io.FFmpegReader(self.matte_video_readers[i].current_video,
                                                  inputdict=inputparameters,
                                                  outputdict=outputparameters)
@@ -305,6 +306,7 @@ class Human36RGB(Dataset):
                 os.mkdir(d_path)
             d_path = os.path.join(d_path,str(index).zfill(5))
             np.save(d_path,[mcv,label,mid,leng])
+            print 'saved',d_path
             if index % 500 == 0:
                 print '{0} {1} {2}/{3}  {4}/{5} saved in {6}s'.format(info[0], info[1], index, data['label'].shape[0],item,self.length,(time()-t))
                 t = time()

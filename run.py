@@ -439,13 +439,13 @@ if __name__ == "__main__":
     #torch.cuda.set_device(args.gpu_id)
     #os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
     #device_ids = [0, 1, 2, 3]
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #drawcirclecv
     # generate mcv
-    # preprocess()
+    preprocess()
 
     # train and test human3.6
-    train_human()
+    # train_human()
 
     # test only and save result
     #test_human('/home/alzeng/remote/fyhuang/alzeng/new_deepfuse/deepfuse/model_best.p2_c12_5e.tar')

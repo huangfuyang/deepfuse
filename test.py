@@ -4,7 +4,7 @@ from server_setting import *
 import os
 from params import *
 from visualization import *
-p = np.load('/home/hfy/data/human36/S1/Videos/Directions/01055.npy')
+p = np.load('/home/hfy/data/human36/S1/Videos/Directions/00005.npy')
 mcv = p[0]
 label = p[1]
 mid = p[2]
