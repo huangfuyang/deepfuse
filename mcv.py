@@ -121,9 +121,10 @@ def make_rgb_mcv(data, label, camera, size = NUM_VOXEL):
         x[x<0] = 0
         y[y>=img_m.shape[1]] = 0
         y[y<0] = 0
-
+        x = x.cpu()
+        y = y.cpu()
         # assign
-        r_matte = img_m[x.cpu(),y.cpu()]/255
+        r_matte = img_m[x,y]/255
         v[i*4] = r_matte * img_rgb[0,x, y]
         v[i*4+1] = r_matte * img_rgb[1,x, y]
         v[i*4+2] = r_matte * img_rgb[2,x, y]

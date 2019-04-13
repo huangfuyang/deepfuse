@@ -123,10 +123,10 @@ class Human36RGB(Dataset):
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
         self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-        # self.training_subjects = ['S1','S5','S6','S7','S8']
-        # self.test_subjects = ['S9','S11']
-        self.training_subjects = ['S1']
-        self.test_subjects = []
+        self.training_subjects = ['S1','S5','S6','S7','S8']
+        self.test_subjects = ['S9','S11']
+        # self.training_subjects = ['S1']
+        # self.test_subjects = []
         #self.subjects = ['S1']
         self.subjects = [Subject(i) for i in self.subjects]
         self.training_subjects = [Subject(i) for i in self.training_subjects]
