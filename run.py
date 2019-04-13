@@ -14,7 +14,7 @@ from time import time
 from model.FUSENet import FuseNet
 from helper import AverageMeter,timeit
 from metrics import mean_error
-from torchvision.transforms import transforms
+# from torchvision.transforms import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from subset_sampler import SubsetSampler
 from parallel import DataParallelModel, DataParallelCriterion
@@ -66,14 +66,14 @@ def warning_init():
 
 # main body
 def train_human(full = False):
-    Fuse = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
+    Fuse = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN).cuda()
   #  net = FuseNet(nSTACK, nModule, nFEAT, JOINT_LEN)
-    net = nn.DataParallel(Fuse)
+    net = nn.DataParallel(Fuse,device_ids=[0])
     warning_init()
     start_time = time()
  #   net.cuda()
   #  net = nn.DataParallel(net)
-    net.to(device)
+  #   net.to(device)
     #net = DataParallelModel(net)
     criterion = nn.MSELoss().cuda()
     criterion = DataParallelCriterion(criterion)
@@ -88,6 +88,7 @@ def train_human(full = False):
                               momentum=args.momentum,
                               weight_decay=args.weight_decay)
     optimizer = optimizer_rms
+    # optimizer = torch.nn.DataParallel(optimizer_rms,device_ids=[0])
     # resume from checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
@@ -239,6 +240,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
         if torch.cuda.device_count() > 1:
             print("Let's use", torch.cuda.device_count(), "GPUs")
             output = model(input_var)
+        else:
+            print("Only 1 GPU found")
+            output = model(input_var)
 
         # record loss
         # leng is voxel length
@@ -377,6 +381,8 @@ def preprocess():
     data.save = True
     for i in range(len(data)):
         d = data[i]
+        if i % 1000 == 0:
+            print '{0}/{1} processed'.format(i,len(data))
 
 
 # visualization data
@@ -431,13 +437,13 @@ if __name__ == "__main__":
     #torch.cuda.set_device(args.gpu_id)
     #os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
     #device_ids = [0, 1, 2, 3]
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #drawcirclecv
     # generate mcv
-    # preprocess()
+    preprocess()
 
     # train and test human3.6
-    train_human()
+    # train_human()
 
     # test only and save result
     #test_human('/home/alzeng/remote/fyhuang/alzeng/new_deepfuse/deepfuse/model_best.p2_c12_5e.tar')

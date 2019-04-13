@@ -123,10 +123,10 @@ class Human36RGB(Dataset):
         self.subjects = filter(lambda x: os.path.isdir(os.path.join(root_path, x)), os.listdir(root_path))
         self.subjects.sort()
         self.subjects = ['S1','S5','S6','S7','S8','S9','S11']
-      #  self.training_subjects = ['S1','S5','S6','S7','S8']
-      #  self.test_subjects = ['S9','S11']
-        self.training_subjects = ['S1']
-        self.test_subjects = ['S9']
+        self.training_subjects = ['S1','S5','S6','S7','S8']
+        self.test_subjects = ['S9','S11']
+        # self.training_subjects = ['S1']
+        # self.test_subjects = ['S9']
         #self.subjects = ['S1']
         self.subjects = [Subject(i) for i in self.subjects]
         self.training_subjects = [Subject(i) for i in self.training_subjects]
@@ -198,15 +198,22 @@ class Human36RGB(Dataset):
         # info = [sub.name, act, i]
         data = self.data_dict[info[0]][info[1]]
         index = info[2]
+        if item < self.training_length:
+            if index % 5 != 0:
+                return 0
+        else:
+            if index % 64 != 0:
+                return 0
         matte_videos = data['matte_video']
         rgb_videos = data['rgb_video']
         label = data['label'][index] # [index,96] the index/th row info,(96,)
         d_path = os.path.join(os.sep, os.path.join(*rgb_videos[0].split(os.sep)[1:-1]),info[1])
-        np_path = os.path.join(d_path, str(index).zfill(5)+'.npz')
+        np_path = os.path.join(d_path, str(index).zfill(5)+'.npy')
+        if self.save and os.path.isfile(np_path):
+            return 0
         if not self.raw and os.path.isfile(np_path):
             npz = np.load(np_path)
-            mcv, label, mid, leng = npz['mcv'], npz['label'], npz['mid'], npz['len'] #mcv:,label:(96,),mid:(3,),len:(1,)
-            mcv = mcv.astype(np.uint8)
+            mcv, label, mid, leng = npz[0],npz[1],npz[2],np.float32(npz[3]) #mcv:,label:(96,),mid:(3,),len:(1,)
             mcv = torch.from_numpy(mcv).cuda().float()
             return mcv, label.astype(np.float32), mid.astype(np.float32), leng.reshape((1)).astype(np.float32)
         for i in range(NUM_CAM_HM):
@@ -259,7 +266,7 @@ class Human36RGB(Dataset):
                         self.frame_data[i+NUM_CAM_HM] = frame
                         break
                     else:
-                        self.matte_video_readers[i].current_frame += 1
+                        self.rgb_video_readers[i].current_frame += 1
             # video matched
             else:
                 if self.matte_video_readers[i].readers is None or \
@@ -297,8 +304,8 @@ class Human36RGB(Dataset):
             if not os.path.isdir(d_path):
                 os.mkdir(d_path)
             d_path = os.path.join(d_path,str(index).zfill(5))
-            np.savez_compressed(d_path,mcv=mcv,label=label,mid = mid,len=leng)
-            if index % 100 == 0:
+            np.save(d_path,[mcv,label,mid,leng])
+            if index % 500 == 0:
                 print '{0} {1} {2}/{3}  {4}/{5} saved in {6}s'.format(info[0], info[1], index, data['label'].shape[0],item,self.length,(time()-t))
                 t = time()
 
@@ -358,7 +365,7 @@ class Human36RGBV(Dataset):
             for act in sub.actionName:
                 print 'load',sub.name,act,
                 self.data_dict[sub.name][act] = {}
-                p = os.path.join(root_path, sub.name,'Videos',act,'*.npz')
+                p = os.path.join(root_path, sub.name,'Videos',act,'*.npy')
                 lines = glob.glob(p)
                 lines.sort()
                 # If you do not use the 30mm,just downsampling from 50fps/s to 10fps/s
@@ -379,7 +386,7 @@ class Human36RGBV(Dataset):
             for act in sub.actionName:
                 print 'load', sub, act,
                 self.data_dict[sub][act] = {}
-                p = os.path.join(root_path, sub.name,'Videos',act,'*.npz')
+                p = os.path.join(root_path, sub.name,'Videos',act,'*.npy')
                 lines = glob.glob(p)
                 lines.sort()
                 if lines is None or len(lines) == 0:
@@ -395,8 +402,13 @@ class Human36RGBV(Dataset):
 
     def __getitem__(self, item):
         d = self.data[item]
+        t = time()
         npz = np.load(d)
-        pvh, label, mid, leng = npz['mcv'],npz['label'],npz['mid'],npz['len']
+        print time()-t
+        t = time()
+        pvh, label, mid, leng = npz[0],npz[1],npz[2],np.float32(npz[3])
+        print time()-t
+        t = time()
         pvh = pvh.astype(np.float32)
         if nCHANNEL == 16:
             pvh[0:3, :, :, :] = pvh[0:3, :, :, :] / 255
@@ -409,6 +421,7 @@ class Human36RGBV(Dataset):
             pvh[6:9, :, :, :] = pvh[8:11, :, :, :]/255
             pvh[9:12, :, :, :] = pvh[12:15, :, :, :]/255
             pvh = pvh[0:12,:,:,:]
+        print time()-t
 
         # if self.data_augmentation:
         #     pvh = random_cut(pvh)

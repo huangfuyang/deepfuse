@@ -28,8 +28,7 @@ def plot_voxel(data):
     v = data[data>=1]
     # print v
     scale = np.ones(x.shape[0])
-    graph = points3d(x,y,z,v)
-    graph.glyph.scale_mode='scale_by_vector'
+    graph = points3d(x,y,z,v,scale_mode = 'vector',scale_factor=1.0)
     show()
 
 

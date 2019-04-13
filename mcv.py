@@ -128,5 +128,5 @@ def make_rgb_mcv(data, label, camera, size = NUM_VOXEL):
         v[i*4+1] = r_matte * img_rgb[1,x, y]
         v[i*4+2] = r_matte * img_rgb[2,x, y]
         v[i*4+3] = r_matte
-    v = v.reshape((camera_l*4,size,size,size))
+    v = v.reshape((camera_l*4,size,size,size)).astype(np.ubyte)
     return v,mid_b,seg_length
