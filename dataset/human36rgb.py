@@ -306,7 +306,6 @@ class Human36RGB(Dataset):
                 os.mkdir(d_path)
             d_path = os.path.join(d_path,str(index).zfill(5))
             np.save(d_path,[mcv,label,mid,leng])
-            print 'saved',d_path
             if index % 500 == 0:
                 print '{0} {1} {2}/{3}  {4}/{5} saved in {6}s'.format(info[0], info[1], index, data['label'].shape[0],item,self.length,(time()-t))
                 t = time()
