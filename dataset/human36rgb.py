@@ -402,13 +402,8 @@ class Human36RGBV(Dataset):
 
     def __getitem__(self, item):
         d = self.data[item]
-        t = time()
         npz = np.load(d)
-        print time()-t
-        t = time()
         pvh, label, mid, leng = npz[0],npz[1],npz[2],np.float32(npz[3])
-        print time()-t
-        t = time()
         pvh = pvh.astype(np.float32)
         if nCHANNEL == 16:
             pvh[0:3, :, :, :] = pvh[0:3, :, :, :] / 255
@@ -416,12 +411,7 @@ class Human36RGBV(Dataset):
             pvh[8:11, :, :, :] = pvh[8:11, :, :, :] / 255
             pvh[12:15, :, :, :] = pvh[12:15, :, :, :] / 255
         elif nCHANNEL == 12:
-            pvh[0:3, :, :, :] = pvh[0:3, :, :, :] /255
-            pvh[3:6, :, :, :] = pvh[4:7, :, :, :] /255
-            pvh[6:9, :, :, :] = pvh[8:11, :, :, :]/255
-            pvh[9:12, :, :, :] = pvh[12:15, :, :, :]/255
-            pvh = pvh[0:12,:,:,:]
-        print time()-t
+            pvh = pvh/255
 
         # if self.data_augmentation:
         #     pvh = random_cut(pvh)
