@@ -373,10 +373,12 @@ class Human36RGBV(Dataset):
                 if lines is None or len(lines) == 0:
                     print '0 loaded'
                     continue
-                for i in range(0, len(lines), 5):
+                for i in range(len(lines)):
+                    # for i in range(0, len(lines), 5):
                     self.data.append(lines[i])
                 print len(lines), 'loaded'
-                self.length += ((len(lines) - 1) // 5) + 1
+                self.length += len(lines)
+                # self.length += ((len(lines) - 1) // 5) + 1
         self.training_length = self.length
         print 'training_length is', self.training_length
 
@@ -393,19 +395,25 @@ class Human36RGBV(Dataset):
                 if lines is None or len(lines) == 0:
                     print '0 loaded'
                     continue
-                for i in range(0,len(lines),64):
+                for i in range(len(lines)):
+                    # for i in range(0, len(lines), 64):
                     self.data.append(lines[i])
                 print len(lines),'loaded'
-                self.test_lengths.append(((len(lines)-1)//64)+1)
-                self.length += ((len(lines)-1)//64)+1
+                self.test_lengths.append(len(lines))
+                # self.test_lengths.append(((len(lines)-1)//64)+1)
+                # self.length += ((len(lines)-1)//64)+1
+                self.length += len(lines)
         self.test_length = self.length-self.training_length
-	print 'test length is:',self.test_length       # self.subjects_length.append(sub_len)
+        print 'test length is:',self.test_length       # self.subjects_length.append(sub_len)
+        print 'total length is',self.length
 
     def __getitem__(self, item):
         d = self.data[item]
         npz = np.load(d)
-        pvh, label, mid, leng = npz[0],npz[1],npz[2],np.float32(npz[3])
-        pvh = pvh.astype(np.float32)
+        pvh = torch.from_numpy(npz[0]).cuda().float()
+        label = torch.from_numpy(npz[1]).cuda()
+        mid = torch.from_numpy(npz[2]).cuda()
+        leng = torch.tensor(npz[3],dtype = torch.float).cuda().reshape((1))
         if nCHANNEL == 16:
             pvh[0:3, :, :, :] = pvh[0:3, :, :, :] / 255
             pvh[4:7, :, :, :] = pvh[4:7, :, :, :] / 255
@@ -416,11 +424,9 @@ class Human36RGBV(Dataset):
 
         # if self.data_augmentation:
         #     pvh = random_cut(pvh)
-        pvh = torch.from_numpy(pvh).cuda()
         # if self.data_augmentation:
         #     pvh,label,mid,leng = data_augmentation3D(pvh,label,mid,leng)
-
-        return pvh,label,mid.astype(np.float32),leng.reshape((1)).astype(np.float32)
+        return pvh,label,mid,leng
 
     def __len__(self):
         return self.length
@@ -501,6 +507,12 @@ def check_volume():
 
 if __name__ == '__main__':
     ds = Human36RGBV(HM_RGB_PATH)
+    s = time()
+    for i in range(100):
+        t = time()
+        d = ds[i]
+        print time()-t
+    print "total:",time()-s
    # print len(ds)
     #ds[0]
 # preprocess()

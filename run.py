@@ -238,7 +238,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # input_var = torch.autograd.Variable(data.to(device).float())
         input_var = torch.autograd.Variable(data)
         # target_var = torch.autograd.Variable(label.to(device))
-        target_var = torch.autograd.Variable(label.cuda())
+        target_var = torch.autograd.Variable(label)
         # if torch.cuda.device_count() > 1:
         #     print("Let's use", torch.cuda.device_count(), "GPUs")
         #     output = model(input_var)
@@ -254,7 +254,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         base = mid.repeat(1, JOINT_LEN)
 
         for j in range(len(output)):
-            output[j] = (output[j].mul(leng.cuda())).add(base.cuda())
+            output[j] = (output[j].mul(leng)).add(base)
         loss = criterion(output[0], target_var)
         for k in range(1, nSTACK):
             loss += criterion(output[k], target_var)
@@ -264,7 +264,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        err_t = float(mean_error(output[-1].cpu(),label)[0])
+        err_t = float(mean_error(output[-1],label)[0])
         # print err_t
         errors.update(err_t, batch_size)
 
@@ -299,13 +299,13 @@ def test(test_loader, model, criterion):
         # measure data loading time
         data, label, mid, leng= s
         batch_size = data.size(0)
-        input_var = data.cuda().float()
-        target_var = label.cuda()
+        input_var = data
+        target_var = label
         # forward net
         output = model(input_var)
         # record loss
-        leng = leng.cuda()*(NUM_VOXEL/NUM_GT_SIZE)
-        base = mid.cuda()-leng.repeat(1,3)*(NUM_GT_SIZE/2-0.5)
+        leng = leng*(NUM_VOXEL/NUM_GT_SIZE)
+        base = mid-leng.repeat(1,3)*(NUM_GT_SIZE/2-0.5)
         leng = leng.repeat(1, JOINT_LEN * 3)
         base = base.repeat(1,JOINT_LEN)
         for j in range(len(output)):
@@ -314,7 +314,7 @@ def test(test_loader, model, criterion):
         for k in range(1, nSTACK):
             loss += criterion(output[k], target_var)
         losses.update(loss.item()/batch_size, 1)
-        output = output[-1].cpu().detach()
+        output = output[-1]
 
         # measure accuracy
         r = mean_error(output, label)
@@ -334,8 +334,8 @@ def test(test_loader, model, criterion):
                   .format(s_ep,s_acc,s_loss,s_time))
 
         # append result to numpy array for saving
-        result = np.append(result, output.numpy(), axis=0)
-        label_full= np.append(label_full, label.numpy(), axis=0)
+        result = np.append(result, output.detach().cpu().numpy(), axis=0)
+        label_full= np.append(label_full, label.cpu().numpy(), axis=0)
 
     return result,label_full, errors.avg
 
@@ -440,12 +440,11 @@ if __name__ == "__main__":
     #os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
     #device_ids = [0, 1, 2, 3]
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    #drawcirclecv
     # generate mcv
-    preprocess()
+    # preprocess()/
 
     # train and test human3.6
-    # train_human()
+    train_human()
 
     # test only and save result
     #test_human('/home/alzeng/remote/fyhuang/alzeng/new_deepfuse/deepfuse/model_best.p2_c12_5e.tar')
